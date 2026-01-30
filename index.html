@@ -1,0 +1,149 @@
+<!-- File: quan-ly-san-pham.html -->
+
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Quản lý sản phẩm</title>
+  <style>
+    body{font-family:Arial,sans-serif;margin:20px;background:#f9f9f9}
+    h1{text-align:center;color:#333}
+    .controls{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:16px;justify-content:center}
+    input,select,button{padding:8px 12px;font-size:14px}
+    button{background:#0066cc;color:white;border:none;border-radius:4px;cursor:pointer}
+    button:hover{background:#0055aa}
+    table{width:100%;border-collapse:collapse;background:white;box-shadow:0 2px 8px rgba(0,0,0,0.1)}
+    th,td{padding:12px;text-align:left;border-bottom:1px solid #ddd}
+    th{background:#444;color:white;cursor:pointer}
+    th:hover{background:#555}
+    tr:nth-child(even){background:#f2f2f2}
+    tr:nth-child(odd){background:#ffffff}
+    .images-cell img{width:60px;height:60px;object-fit:cover;margin-right:6px;border-radius:4px;border:1px solid #ddd}
+    .pagination{margin-top:16px;text-align:center}
+    .pagination button{margin:0 4px;min-width:36px}
+    .pagination button.active{background:#444}
+  </style>
+</head>
+<body>
+
+<h1>Quản lý sản phẩm</h1>
+
+<div class="controls">
+  <input type="text" id="search" placeholder="Tìm theo title..." />
+  <select id="perPage">
+    <option value="5">5 mỗi trang</option>
+    <option value="10" selected>10 mỗi trang</option>
+    <option value="20">20 mỗi trang</option>
+  </select>
+  <button onclick="sortTable('title','asc')">Tên ↑</button>
+  <button onclick="sortTable('title','desc')">Tên ↓</button>
+  <button onclick="sortTable('price','asc')">Giá ↑</button>
+  <button onclick="sortTable('price','desc')">Giá ↓</button>
+</div>
+
+<table id="productTable">
+  <thead>
+    <tr>
+      <th>ID</th>
+      <th>Title</th>
+      <th>Price</th>
+      <th>Category</th>
+      <th>Images</th>
+    </tr>
+  </thead>
+  <tbody id="tbody"></tbody>
+</table>
+
+<div class="pagination" id="pagination"></div>
+
+<script>
+let products = [];
+let currentPage = 1;
+let perPage = 10;
+let sortField = 'id';
+let sortDirection = 'asc';
+
+const searchInput = document.getElementById('search');
+const perPageSelect = document.getElementById('perPage');
+const tbody = document.getElementById('tbody');
+const pagination = document.getElementById('pagination');
+
+async function loadData() {
+  try {
+    const res = await fetch('https://api.escuelajs.co/api/v1/products');
+    products = await res.json();
+    renderTable();
+  } catch (e) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:red">Không tải được dữ liệu</td></tr>';
+  }
+}
+
+function renderTable() {
+  const start = (currentPage - 1) * perPage;
+  const end = start + perPage;
+
+  let filtered = products.filter(p =>
+    p.title.toLowerCase().includes(searchInput.value.toLowerCase().trim())
+  );
+
+  filtered.sort((a, b) => {
+    let valA = sortField === 'price' ? a.price : a[sortField];
+    let valB = sortField === 'price' ? b.price : b[sortField];
+    if (typeof valA === 'string') { valA = valA.toLowerCase(); valB = valB.toLowerCase(); }
+    if (valA < valB) return sortDirection === 'asc' ? -1 : 1;
+    if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  const pageItems = filtered.slice(start, end);
+
+  tbody.innerHTML = '';
+
+  pageItems.forEach(p => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${p.id}</td>
+      <td>${p.title}</td>
+      <td>${p.price.toLocaleString()} $</td>
+      <td>${p.category?.name || '—'}</td>
+      <td class="images-cell">
+        ${p.images.map(src => `<img src="${src}" alt="${p.title}" onerror="this.src='https://via.placeholder.com/60?text=Error'">`).join('')}
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  renderPagination(filtered.length);
+}
+
+function renderPagination(total) {
+  const totalPages = Math.ceil(total / perPage);
+  pagination.innerHTML = '';
+  if (totalPages <= 1) return;
+
+  for (let i = 1; i <= totalPages; i++) {
+    const btn = document.createElement('button');
+    btn.textContent = i;
+    if (i === currentPage) btn.classList.add('active');
+    btn.onclick = () => { currentPage = i; renderTable(); };
+    pagination.appendChild(btn);
+  }
+}
+
+function sortTable(field, dir) {
+  sortField = field;
+  sortDirection = dir;
+  currentPage = 1;
+  renderTable();
+}
+
+searchInput.oninput = () => { currentPage = 1; renderTable(); };
+perPageSelect.onchange = () => { perPage = +perPageSelect.value; currentPage = 1; renderTable(); };
+
+// Khởi động
+loadData();
+</script>
+
+</body>
+</html>
